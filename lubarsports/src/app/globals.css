@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --lu-red: #d90429;
+  --lu-black: #000000;
+  --lu-white: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--lu-white);
+  --color-foreground: var(--lu-black);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lu-white: #0a0a0a;
+    --lu-black: #ededed;
+  }
+}
+
+body {
+  @apply text-black min-h-screen font-sans antialiased;
+}
+
+.site-bg {
+  background-image: url('/backgrounds/BarSportsAppBackground.jpeg');
+  background-size: 320px auto; /* shrink: adjust pixel width as needed */
+  background-repeat: repeat;
+  background-position: top left;
+  background-attachment: scroll;
+}
+
+.table-header {
+  background-color: var(--lu-red);
+  color: var(--lu-white);
+}
+
+.menu-link {
+  @apply bg-white border-2 border-neutral-200 text-black hover:bg-neutral-100 hover:text-black transition rounded-lg shadow-sm font-medium;
+}
+
+.card {
+  @apply bg-white/80 rounded-2xl shadow-xl p-6 mb-6 backdrop-blur-md;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-semibold text-gray-900;
+}
+
+input, button, select, textarea {
+  @apply focus:outline-none focus:ring-2 focus:ring-[color:var(--lu-red)] transition;
+}

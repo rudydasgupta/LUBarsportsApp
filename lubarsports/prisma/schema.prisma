@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env(DATABASE_URL)
+}
+
+model Division {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  sport     String
+  teams     Team[]
+  fixtures  Fixture[]
+  playerStats PlayerStat[]
+}
+
+model Team {
+  id         Int      @id @default(autoincrement())
+  name       String
+  division   Division @relation(fields: [divisionId], references: [id])
+  divisionId Int
+  players    Player[]
+  fixturesHome Fixture[] @relation("HomeTeam")
+  fixturesAway Fixture[] @relation("AwayTeam")
+  points     Int      @default(0)
+  captain    Captain?
+  poolNominations PoolNomination[]
+
+  @@unique([name, divisionId])
+}
+
+model Player {
+  id      Int    @id @default(autoincrement())
+  name    String
+  team    Team   @relation(fields: [teamId], references: [id])
+  teamId  Int
+  stats   PlayerStat[]
+
+  @@unique([name, teamId])
+}
+
+model Fixture {
+  id          Int      @id @default(autoincrement())
+  division    Division @relation(fields: [divisionId], references: [id])
+  divisionId  Int
+  homeTeam    Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  homeTeamId  Int
+  awayTeam    Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  awayTeamId  Int
+  date        DateTime
+  result      Result?
+  poolNominations PoolNomination[]
+
+  @@unique([divisionId, homeTeamId, awayTeamId, date])
+}
+
+model Result {
+  id         Int      @id @default(autoincrement())
+  fixture    Fixture  @relation(fields: [fixtureId], references: [id])
+  fixtureId  Int      @unique
+  homeScore  Int
+  awayScore  Int
+  details    String?  // JSON or text for sport-specific details
+}
+
+model PlayerStat {
+  id        Int     @id @default(autoincrement())
+  player    Player  @relation(fields: [playerId], references: [id])
+  playerId  Int
+  division  Division @relation(fields: [divisionId], references: [id])
+  divisionId Int
+  gamesPlayed Int
+  gamesWon    Int
+  points      Int
+  averages    Float?
+}
+
+model Captain {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String // hashed password
+  fullName String?
+  team     Team   @relation(fields: [teamId], references: [id])
+  teamId   Int   @unique
+}
+
+model PoolNomination {
+  id         Int      @id @default(autoincrement())
+  fixture    Fixture  @relation(fields: [fixtureId], references: [id])
+  fixtureId  Int
+  team       Team     @relation(fields: [teamId], references: [id])
+  teamId     Int
+  gameNumber Int      // 1-9
+  playerName String
+  pickedFirst Boolean // true if this team picked first for this game
+  brokeFirst  Boolean // true if this team broke first for this game
+  locked     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([fixtureId, teamId, gameNumber])
+}
