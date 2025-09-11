@@ -9,6 +9,7 @@ export default function LeagueFixturesPage() {
   const league = params.league as string;
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => getWeekStart(new Date()));
 
   // Map URL slugs to division names
   const leagueMap: Record<string, string> = {
@@ -21,6 +22,33 @@ export default function LeagueFixturesPage() {
   };
 
   const divisionName = leagueMap[league];
+
+  // Helpers: week calculations (Monday-Sunday window)
+  function getWeekStart(date: Date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay(); // 0 (Sun) .. 6 (Sat)
+    const diff = (day + 6) % 7; // days since Monday
+    d.setDate(d.getDate() - diff);
+    return d;
+  }
+
+  function inSelectedWeek(dateString: string) {
+    const start = selectedWeekStart;
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    const d = new Date(dateString);
+    d.setHours(0, 0, 0, 0);
+    return d >= start && d <= end;
+  }
+
+  function formatWeekRange(start: Date) {
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    const startStr = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}`;
+    const endStr = `${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth() + 1).padStart(2, '0')}`;
+    return `${startStr} - ${endStr}`;
+  }
 
   useEffect(() => {
     if (!divisionName) return;
@@ -53,6 +81,8 @@ export default function LeagueFixturesPage() {
     );
   }
 
+  const visibleFixtures = fixtures.filter(f => inSelectedWeek(f.date));
+
   return (
     <main className="min-h-screen flex flex-col items-center bg-white text-black p-4">
       <div className="w-full max-w-4xl">
@@ -66,7 +96,34 @@ export default function LeagueFixturesPage() {
         </Link>
         </div>
 
-        <div className="bg-gray-100 rounded-lg p-6 min-h-[300px] flex flex-col items-center justify-center">
+        <div className="bg-gray-100 rounded-lg p-6 min-h-[300px]">
+          {/* Week navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              className="px-3 py-1 border rounded hover:bg-gray-50"
+              onClick={() => setSelectedWeekStart(prev => {
+                const d = new Date(prev);
+                d.setDate(d.getDate() - 7);
+                return getWeekStart(d);
+              })}
+            >
+              ← Previous week
+            </button>
+            <div className="text-sm text-gray-700">
+              Viewing week: <span className="font-medium">{formatWeekRange(selectedWeekStart)}</span>
+            </div>
+            <button
+              className="px-3 py-1 border rounded hover:bg-gray-50"
+              onClick={() => setSelectedWeekStart(prev => {
+                const d = new Date(prev);
+                d.setDate(d.getDate() + 7);
+                return getWeekStart(d);
+              })}
+            >
+              Next week →
+            </button>
+          </div>
+
           {loading ? (
             <span className="text-xl text-gray-500">Loading fixtures...</span>
           ) : fixtures.length === 0 ? (
@@ -82,7 +139,9 @@ export default function LeagueFixturesPage() {
                 </tr>
               </thead>
               <tbody>
-                {fixtures.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(f => (
+                {visibleFixtures
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map(f => (
                   <tr key={f.id}>
                     <td className="px-4 py-2 border text-center">{formatDate(f.date)}</td>
                     <td className="px-4 py-2 border text-center">{f.homeTeam.name}</td>
