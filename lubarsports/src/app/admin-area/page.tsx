@@ -82,9 +82,14 @@ export default async function AdminAreaPage() {
     },
     orderBy: { date: "asc" },
   });
+  // Serialize dates for client components expecting string dates
+  const fixturesSerialized = fixtures.map(f => ({
+    ...f,
+    date: (f.date instanceof Date ? f.date.toISOString() : (f.date as any)),
+  }));
 
   // Get upcoming fixtures for pool nominations (only future fixtures)
-  const upcomingFixtures = fixtures.filter(f => new Date(f.date) >= new Date());
+  const upcomingFixtures = fixturesSerialized.filter(f => new Date(f.date) >= new Date());
   return (
     <main className="flex flex-col items-center justify-center min-h-screen">
       <div className="bg-white/90 rounded-xl shadow-xl p-8 w-full max-w-4xl flex flex-col gap-8">
@@ -118,7 +123,7 @@ export default async function AdminAreaPage() {
         
         <section className="w-full">
           <ResultsInput 
-            fixtures={fixtures} 
+            fixtures={fixturesSerialized} 
             coordinatorType={isPoolCoordinator ? 'CPC' : 'CDC'} 
             divisionName={divisionName} 
           />
