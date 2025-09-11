@@ -14,7 +14,6 @@ export default function PoolUploadWrapper({ fixtures, team }: { fixtures: any[],
         const isHome = fixture.homeTeamId === team.id;
         const myNoms = fixture.poolNominations.filter((n: any) => n.teamId === team.id);
         const oppNoms = fixture.poolNominations.filter((n: any) => n.teamId !== team.id);
-        const locked = myNoms.length === 9;
         return (
           <div key={fixture.id} className="mb-8">
             <PoolUpload
@@ -23,7 +22,6 @@ export default function PoolUploadWrapper({ fixtures, team }: { fixtures: any[],
               isHome={isHome}
               myNoms={myNoms}
               oppNoms={oppNoms}
-              locked={locked}
             />
           </div>
         );
