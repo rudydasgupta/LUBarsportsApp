@@ -82,10 +82,37 @@ export default async function AdminAreaPage() {
     },
     orderBy: { date: "asc" },
   });
-  // Serialize dates for client components expecting string dates
+  // Serialize and shape fixtures for client components expecting specific types
   const fixturesSerialized = fixtures.map(f => ({
-    ...f,
+    id: f.id,
     date: (f.date instanceof Date ? f.date.toISOString() : (f.date as any)),
+    homeTeam: { name: f.homeTeam.name },
+    awayTeam: { name: f.awayTeam.name },
+    result: f.result ? {
+      homeScore: f.result.homeScore,
+      awayScore: f.result.awayScore,
+      details: f.result.details ?? undefined,
+    } : undefined,
+    // Additional fields retained for server-only consumers if needed by other sections
+    poolNominations: f.poolNominations,
+    homeTeamId: f.homeTeamId,
+    awayTeamId: f.awayTeamId,
+  }));
+
+  // Narrow shape specifically for ResultsInput props
+  type ResultsInputFixture = {
+    id: number;
+    date: string;
+    homeTeam: { name: string };
+    awayTeam: { name: string };
+    result?: { homeScore: number; awayScore: number; details?: string };
+  };
+  const fixturesForResults: ResultsInputFixture[] = fixturesSerialized.map(f => ({
+    id: f.id,
+    date: f.date,
+    homeTeam: f.homeTeam,
+    awayTeam: f.awayTeam,
+    result: f.result,
   }));
 
   // Get upcoming fixtures for pool nominations (only future fixtures)
@@ -123,7 +150,7 @@ export default async function AdminAreaPage() {
         
         <section className="w-full">
           <ResultsInput 
-            fixtures={fixturesSerialized} 
+            fixtures={fixturesForResults} 
             coordinatorType={isPoolCoordinator ? 'CPC' : 'CDC'} 
             divisionName={divisionName} 
           />
