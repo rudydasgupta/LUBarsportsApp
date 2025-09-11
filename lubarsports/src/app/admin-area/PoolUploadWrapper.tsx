@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 const PoolUpload = dynamic(() => import("./pool-upload"), { ssr: false });
 
-export default function PoolUploadWrapper({ fixtures, team }: { fixtures: any[], team: any }) {
+export default function PoolUploadWrapper({ fixtures, team, captain }: { fixtures: any[], team: any, captain?: any }) {
   if (!fixtures || fixtures.length === 0) {
     return <div className="bg-gray-100 rounded-lg p-6 text-center text-gray-400">No upcoming Open A&apos;s Pool fixtures.</div>;
   }
