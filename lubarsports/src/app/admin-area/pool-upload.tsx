@@ -1,7 +1,11 @@
 "use client";
 import { useState } from "react";
 
-export default function PoolUpload({ fixture, team, isHome, myNoms, oppNoms }: { fixture: any, team: any, isHome: boolean, myNoms: any[], oppNoms: any[] }) {
+interface TeamLite { id: number; name: string }
+interface NominationLite { gameNumber: number; playerName: string; locked?: boolean }
+interface FixtureLite { id: number; homeTeam: TeamLite; awayTeam: TeamLite; awayTeamId: number }
+
+export default function PoolUpload({ fixture, team, isHome, myNoms, oppNoms }: { fixture: FixtureLite, team: TeamLite, isHome: boolean, myNoms: NominationLite[], oppNoms: NominationLite[] }) {
   const [inputs, setInputs] = useState(Array(5).fill(""));
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
