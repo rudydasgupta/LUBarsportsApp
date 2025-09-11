@@ -5,7 +5,7 @@ import { navLinks } from "./sidebar-nav";
 export default function TopNav() {
   return (
     <nav className="hidden md:flex items-center gap-3">
-      {navLinks.map((link) => (
+      {(Array.isArray(navLinks) ? navLinks : []).map((link) => (
         <Link
           key={link.href}
           href={link.href}
