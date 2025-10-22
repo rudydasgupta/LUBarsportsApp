@@ -13,6 +13,12 @@ async function getCaptains() {
   });
 }
 
+async function getAdmins() {
+  return prisma.admin.findMany({
+    orderBy: { email: "asc" },
+  });
+}
+
 async function getTeams() {
   return prisma.team.findMany({
     include: { division: true },
@@ -31,6 +37,7 @@ export default async function AdminPage() {
   }
 
   const captains = await getCaptains();
+  const admins = await getAdmins();
   const teams = await getTeams();
 
   return (
@@ -61,16 +68,35 @@ export default async function AdminPage() {
               <tr className="table-header">
                 <th className="px-4 py-2 border">Full Name</th>
                 <th className="px-4 py-2 border">Email</th>
+                <th className="px-4 py-2 border">Admin Type</th>
                 <th className="px-4 py-2 border">Coordinator Type</th>
                 <th className="px-4 py-2 border">League</th>
                 <th className="px-4 py-2 border">Actions</th>
               </tr>
             </thead>
             <tbody>
+              {/* General Admins */}
+              {admins.map((admin) => (
+                <tr key={`admin-${admin.id}`}>
+                  <td className="px-4 py-2 border">{admin.fullName || "-"}</td>
+                  <td className="px-4 py-2 border">{admin.email}</td>
+                  <td className="px-4 py-2 border font-semibold">{admin.adminType}</td>
+                  <td className="px-4 py-2 border">-</td>
+                  <td className="px-4 py-2 border">All Leagues</td>
+                  <td className="px-4 py-2 border text-center">
+                    <form action={`/api/admin/delete-admin`} method="POST" style={{ display: "inline" }}>
+                      <input type="hidden" name="id" value={admin.id} />
+                      <button type="submit" className="text-red-600 underline hover:text-red-800">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {/* Captains/Coordinators */}
               {captains.map((c) => (
-                <tr key={c.id}>
+                <tr key={`captain-${c.id}`}>
                   <td className="px-4 py-2 border">{c.fullName || "-"}</td>
                   <td className="px-4 py-2 border">{c.email}</td>
+                  <td className="px-4 py-2 border">Captain</td>
                   <td className="px-4 py-2 border">{
                     (() => {
                       const dn = c.team?.division?.name?.toLowerCase() || '';
