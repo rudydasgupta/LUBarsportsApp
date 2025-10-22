@@ -18,10 +18,8 @@ export async function POST(req: NextRequest) {
     const fullName = formData.get('fullName') as string;
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
-    const coordinatorType = formData.get('coordinatorType') as string;
-    const gender = formData.get('gender') as string;
     
-    console.log('Received form data:', { fullName, email, coordinatorType, gender });
+    console.log('Received form data:', { fullName, email });
     
     if (!email || !password) {
       console.log('Missing required fields:', { email: !!email, password: !!password });
