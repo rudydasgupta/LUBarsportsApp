@@ -120,10 +120,8 @@ async function main() {
         return parsed;
       }
     }
-    const now = new Date();
-    const year = now.getFullYear();
-    // Month is 0-based; 9 = October. Noon local to avoid timezone midnight issues
-    const d = new Date(year, 9, 13, 12, 0, 0, 0);
+    // Set to 2025 for the current season - Monday 13th October 2025
+    const d = new Date(2025, 9, 13, 12, 0, 0, 0);
     return d;
   }
   const week2Start = getWeek2StartDate();

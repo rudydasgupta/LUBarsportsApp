@@ -18,6 +18,12 @@ export function getAdminIdFromRequest(req: NextRequest): number | null {
     return isNaN(id) ? null : id;
   }
   
+  // Handle captain session
+  if (cookie.startsWith('captain_')) {
+    const id = Number(cookie.replace('captain_', ''));
+    return isNaN(id) ? null : id;
+  }
+  
   return null;
 }
 

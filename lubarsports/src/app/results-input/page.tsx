@@ -19,23 +19,43 @@ async function getAdminFromCookie() {
       id: 0,
       email: 'r.dasgupta@lancaster.ac.uk',
       fullName: 'Super Admin',
-      teamId: 1 // Default to first team for demo
+      adminType: 'SUPER',
+      teamId: null
     };
   }
   
-  // Check if it's a regular admin session
+  // Check if it's a general admin session
   if (sessionId.startsWith('admin_')) {
     const adminId = Number(sessionId.replace('admin_', ''));
-    const admin = await prisma.captain.findUnique({
-      where: { id: adminId },
-      include: { team: true }
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId }
     });
     if (admin) {
       return {
         id: admin.id,
         email: admin.email,
         fullName: admin.fullName || 'Admin User',
-        teamId: admin.teamId
+        adminType: admin.adminType,
+        teamId: null
+      };
+    }
+  }
+  
+  // Check if it's a captain session
+  if (sessionId.startsWith('captain_')) {
+    const captainId = Number(sessionId.replace('captain_', ''));
+    const captain = await prisma.captain.findUnique({
+      where: { id: captainId },
+      include: { team: { include: { division: true } } }
+    });
+    if (captain) {
+      return {
+        id: captain.id,
+        email: captain.email,
+        fullName: captain.fullName || 'Captain',
+        adminType: captain.adminType || 'CAPTAIN',
+        teamId: captain.teamId,
+        division: captain.team.division.name
       };
     }
   }
@@ -50,29 +70,35 @@ export default async function ResultsInputPage({ searchParams }: { searchParams:
     redirect("/login");
   }
   
-  // Get the admin's team
-  const team = await prisma.team.findUnique({
-    where: { id: admin.teamId },
-    include: { division: true },
-  });
-  
-  if (!team) {
-    return <div className="p-8 text-center">Team not found.</div>;
-  }
-  
-  // Determine coordinator type from admin's home division
-  const homeDivisionName = team.division.name;
-  const isPoolCoordinator = homeDivisionName.toLowerCase().includes('pool');
-  const isDartsCoordinator = homeDivisionName.toLowerCase().includes('darts');
-
-  // Allowed divisions: CPC => all pool + dominoes; CDC => all darts + dominoes (case-insensitive filtering done in JS)
+  // Determine allowed divisions based on admin type
   const allDivisions = await prisma.division.findMany({ orderBy: { name: 'asc' } });
-  const allowedDivisions = allDivisions.filter(d => {
-    const dn = d.name.toLowerCase();
-    if (isPoolCoordinator) return dn.includes('pool') || dn.includes('domino');
-    if (isDartsCoordinator) return dn.includes('darts') || dn.includes('domino');
-    return d.name === homeDivisionName;
-  });
+  let allowedDivisions = allDivisions;
+  
+  if (admin.adminType === 'SUPER' || admin.adminType === 'GENERAL') {
+    // Super admin and general admin can access all divisions
+    allowedDivisions = allDivisions;
+  } else if (admin.adminType === 'CPC') {
+    // College Pool Coordinator can access pool and dominoes
+    allowedDivisions = allDivisions.filter(d => {
+      const dn = d.name.toLowerCase();
+      return dn.includes('pool') || dn.includes('domino');
+    });
+  } else if (admin.adminType === 'CDC') {
+    // College Darts Coordinator can access darts and dominoes
+    allowedDivisions = allDivisions.filter(d => {
+      const dn = d.name.toLowerCase();
+      return dn.includes('darts') || dn.includes('domino');
+    });
+  } else if (admin.adminType === 'CAPTAIN' && admin.teamId) {
+    // Regular captain can only access their own division
+    const team = await prisma.team.findUnique({
+      where: { id: admin.teamId },
+      include: { division: true },
+    });
+    if (team) {
+      allowedDivisions = [team.division];
+    }
+  }
 
   if (allowedDivisions.length === 0) {
     return <div className="p-8 text-center">No divisions available.</div>;
@@ -125,7 +151,7 @@ export default async function ResultsInputPage({ searchParams }: { searchParams:
         
         <ResultsInput 
           fixtures={fixtures} 
-          coordinatorType={isPoolCoordinator ? 'CPC' : 'CDC'} 
+          coordinatorType={admin.adminType || 'Admin'} 
           divisionName={selectedDivisionName} 
         />
       </div>
