@@ -125,6 +125,36 @@ async function getLatestResults(collegeName: string) {
   return latest;
 }
 
+async function getLeagueRanks(collegeName: string) {
+  // Get all divisions
+  const divisions = await prisma.division.findMany({
+    orderBy: { name: 'asc' }
+  });
+
+  const leagueRanks = [];
+
+  for (const division of divisions) {
+    // Get all teams in this division, ordered by points (descending)
+    const teams = await prisma.team.findMany({
+      where: { divisionId: division.id },
+      orderBy: { points: 'desc' }
+    });
+
+    // Find the college's position in this division
+    const collegeTeam = teams.find(team => team.name === collegeName);
+    if (collegeTeam) {
+      const position = teams.findIndex(team => team.id === collegeTeam.id) + 1;
+      leagueRanks.push({
+        league: division.name,
+        rank: position,
+        points: collegeTeam.points
+      });
+    }
+  }
+
+  return leagueRanks;
+}
+
 export default async function CollegeHomePage({ params }: { params: Promise<{ college: string }> }) {
   const { college: collegeSlug } = await params;
   const college = collegeData[collegeSlug as keyof typeof collegeData];
@@ -132,9 +162,10 @@ export default async function CollegeHomePage({ params }: { params: Promise<{ co
     return <div className="p-8 text-center">College not found.</div>;
   }
 
-  const [upcomingFixtures, latestResults] = await Promise.all([
+  const [upcomingFixtures, latestResults, leagueRanks] = await Promise.all([
     getUpcomingFixtures(college.name),
-    getLatestResults(college.name)
+    getLatestResults(college.name),
+    getLeagueRanks(college.name)
   ]);
 
   return (
@@ -150,10 +181,27 @@ export default async function CollegeHomePage({ params }: { params: Promise<{ co
             <tr className="table-header">
               <th className="px-4 py-2 border">League</th>
               <th className="px-4 py-2 border">Rank</th>
+              <th className="px-4 py-2 border">Points</th>
             </tr>
           </thead>
           <tbody>
-            {/* Empty for now */}
+            {leagueRanks.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-4 py-2 border text-center text-gray-500">
+                  No league data available
+                </td>
+              </tr>
+            ) : (
+              leagueRanks.map((rank, index) => (
+                <tr key={index}>
+                  <td className="px-4 py-2 border text-center">{rank.league}</td>
+                  <td className="px-4 py-2 border text-center font-semibold">
+                    {rank.rank === 1 ? '🥇' : rank.rank === 2 ? '🥈' : rank.rank === 3 ? '🥉' : ''} {rank.rank}
+                  </td>
+                  <td className="px-4 py-2 border text-center">{rank.points}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
