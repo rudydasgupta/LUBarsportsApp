@@ -102,6 +102,7 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           fixtureId,
           homeScore: result.homeScore,
@@ -260,6 +261,7 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
                           const res = await fetch('/api/fixtures/delete-result', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
                             body: JSON.stringify({ fixtureId: fixture.id })
                           });
                           if (res.ok) {

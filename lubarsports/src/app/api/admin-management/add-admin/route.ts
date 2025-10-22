@@ -23,51 +23,20 @@ export async function POST(req: NextRequest) {
     
     console.log('Received form data:', { fullName, email, coordinatorType, gender });
     
-    if (!email || !password || !coordinatorType || !gender) {
-      console.log('Missing fields:', { email: !!email, password: !!password, coordinatorType: !!coordinatorType, gender: !!gender });
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
-    }
-  
-  // Find teams that match the coordinator type and gender
-  const teams = await prisma.team.findMany({
-    include: { division: true }
-  });
-  
-    const filteredTeams = teams.filter(team => {
-      const divisionName = team.division.name.toLowerCase();
-      
-      // Check coordinator type
-      const isPool = coordinatorType === "CPC" && divisionName.includes("pool");
-      const isDarts = coordinatorType === "CDC" && divisionName.includes("darts");
-      
-      // Check gender
-      const isOpen = gender === "Open" && !divisionName.includes("women");
-      const isWomens = gender === "Women" && divisionName.includes("women");
-      
-      return (isPool || isDarts) && (isOpen || isWomens);
-    });
-    
-    console.log('Filtered teams:', filteredTeams.map(t => ({ name: t.name, division: t.division.name })));
-    
-    if (filteredTeams.length === 0) {
-      console.log('No teams found for combination:', { coordinatorType, gender });
-      return NextResponse.json({ error: 'No teams found for this combination' }, { status: 400 });
+    if (!email || !password) {
+      console.log('Missing required fields:', { email: !!email, password: !!password });
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
   
   const hashed = await bcrypt.hash(password, 10);
   
-  // Create admin for the first matching team (since email must be unique)
-  // In a real system, you might want to create separate accounts for each team
-  // or use a different approach for multi-team coordinators
-  const firstTeam = filteredTeams[0];
-  
+  // Create admin user (not captain - admins are not tied to specific teams)
   try {
-    await prisma.captain.create({
+    await prisma.admin.create({
       data: { 
         email, 
         password: hashed, 
-        teamId: firstTeam.id,
-        adminType: coordinatorType, // Persist CPC/CDC so permissions apply
+        adminType: 'GENERAL', // General admin can access all leagues
         ...(fullName ? { fullName } : {}) 
       },
     });

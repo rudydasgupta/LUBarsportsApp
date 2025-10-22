@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export async function POST(req: NextRequest) {
   try {
     const adminId = getAdminIdFromRequest(req);
-    if (!adminId && adminId !== 0) {
+    if (adminId === null) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -23,20 +23,48 @@ export async function POST(req: NextRequest) {
     if (!fixture) return NextResponse.json({ error: 'Fixture not found' }, { status: 404 });
     if (!fixture.result) return NextResponse.json({ success: true });
 
-    // Check permission: same as submit route
-    const admin = await prisma.captain.findUnique({
-      where: { id: adminId === 0 ? undefined : adminId },
-      include: { team: { include: { division: true } } }
-    });
-    if (adminId !== 0 && !admin) return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
-    if (adminId !== 0) {
-      const adminDivisionName = admin!.team.division.name.toLowerCase();
-      const fixtureDivisionName = fixture.division.name.toLowerCase();
-      const isPoolCoordinator = adminDivisionName.includes('pool') && fixtureDivisionName.includes('pool');
-      const isDartsCoordinator = adminDivisionName.includes('darts') && fixtureDivisionName.includes('darts');
-      if (!isPoolCoordinator && !isDartsCoordinator && adminDivisionName !== fixtureDivisionName) {
-        return NextResponse.json({ error: 'Permission denied for this division' }, { status: 403 });
+    // Check admin permissions based on admin type (same logic as submit-result)
+    let hasPermission = false;
+    
+    // Check if it's a super admin (id = 0)
+    if (adminId === 0) {
+      hasPermission = true;
+    } else {
+      // Check Admin table first
+      const generalAdmin = await prisma.admin.findUnique({
+        where: { id: adminId }
+      });
+      
+      if (generalAdmin) {
+        // General admin can access all divisions
+        hasPermission = true;
+      } else {
+        // Check Captain table for coordinators
+        const captain = await prisma.captain.findUnique({
+          where: { id: adminId },
+          include: { team: { include: { division: true } } }
+        });
+        
+        if (captain) {
+          const adminType = captain.adminType;
+          const fixtureDivisionName = fixture.division.name.toLowerCase();
+          
+          if (adminType === 'CPC') {
+            // College Pool Coordinator can access pool and dominoes
+            hasPermission = fixtureDivisionName.includes('pool') || fixtureDivisionName.includes('domino');
+          } else if (adminType === 'CDC') {
+            // College Darts Coordinator can access darts and dominoes
+            hasPermission = fixtureDivisionName.includes('darts') || fixtureDivisionName.includes('domino');
+          } else {
+            // Regular captain can only access their own division
+            hasPermission = captain.team.division.name === fixture.division.name;
+          }
+        }
       }
+    }
+    
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Permission denied for this division' }, { status: 403 });
     }
 
     // Transaction: reverse points allocation and delete result

@@ -26,11 +26,6 @@ export default async function AdminManagementPage() {
     redirect("/results-input");
   }
 
-  // Get all teams and divisions for the admin form
-  const teams = await prisma.team.findMany({
-    include: { division: true },
-  });
-
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-4">
       <div className="bg-white/90 rounded-xl shadow-xl p-8 w-full max-w-2xl flex flex-col gap-8">
@@ -50,7 +45,7 @@ export default async function AdminManagementPage() {
 
         <div className="bg-gray-50 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Add New Admin</h2>
-          <AddAdminForm teams={teams} />
+          <AddAdminForm />
         </div>
       </div>
     </main>

@@ -1,37 +1,46 @@
 "use client";
 import { useState } from "react";
 
-export default function AddAdminForm({ teams }: { teams: any[] }) {
-  const [selectedCoordinatorType, setSelectedCoordinatorType] = useState("");
-  const [selectedGender, setSelectedGender] = useState("");
-  
-  // Filter teams based on coordinator type and gender
-  const filteredTeams = teams.filter(team => {
-    const divisionName = team.division.name.toLowerCase();
-    
-    // Check coordinator type
-    const isPool = selectedCoordinatorType === "CPC" && divisionName.includes("pool");
-    const isDarts = selectedCoordinatorType === "CDC" && divisionName.includes("darts");
-    
-    // Check gender
-    const isOpen = selectedGender === "Open" && !divisionName.includes("women");
-    const isWomens = selectedGender === "Women" && divisionName.includes("women");
-    
-    return (isPool || isDarts) && (isOpen || isWomens);
-  });
+export default function AddAdminForm() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted with:', { selectedCoordinatorType, selectedGender, filteredTeams });
+    console.log('Form submitted');
     
-    if (filteredTeams.length === 0) {
-      alert('No teams found for this combination. Please check your selections.');
-      return;
+    setIsSubmitting(true);
+    
+    try {
+      const formData = new FormData();
+      const form = e.target as HTMLFormElement;
+      
+      // Get form data
+      const fullName = (form.querySelector('input[name="fullName"]') as HTMLInputElement)?.value;
+      const email = (form.querySelector('input[name="email"]') as HTMLInputElement)?.value;
+      const password = (form.querySelector('input[name="password"]') as HTMLInputElement)?.value;
+      
+      formData.append('fullName', fullName);
+      formData.append('email', email);
+      formData.append('password', password);
+      
+      const response = await fetch('/api/admin-management/add-admin', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (response.ok) {
+        // Redirect to admin management page on success
+        window.location.href = '/admin-management';
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error || 'Failed to add admin'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert('An error occurred while submitting the form');
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Submit the form
-    const form = e.target as HTMLFormElement;
-    form.submit();
   };
 
   return (
@@ -40,54 +49,17 @@ export default function AddAdminForm({ teams }: { teams: any[] }) {
       <input type="email" name="email" placeholder="Email" required className="border border-gray-300 rounded px-3 py-2" />
       <input type="password" name="password" placeholder="Password" required className="border border-gray-300 rounded px-3 py-2" />
       
-      <select 
-        name="coordinatorType" 
-        value={selectedCoordinatorType} 
-        onChange={e => setSelectedCoordinatorType(e.target.value)} 
-        required 
-        className="border border-gray-300 rounded px-3 py-2"
-      >
-        <option value="">Select Coordinator Type</option>
-        <option value="CPC">College Pool Coordinator (CPC)</option>
-        <option value="CDC">College Darts Coordinator (CDC)</option>
-      </select>
-      
-      <select 
-        name="gender" 
-        value={selectedGender} 
-        onChange={e => setSelectedGender(e.target.value)} 
-        required 
-        className="border border-gray-300 rounded px-3 py-2"
-      >
-        <option value="">Select League</option>
-        <option value="Open">Open&apos;s</option>
-        <option value="Women">Women&apos;s+</option>
-      </select>
-      
-      <div className="text-sm text-gray-600">
-        {filteredTeams.length > 0 && (
-          <div>
-            <strong>Available teams:</strong>
-            <ul className="list-disc list-inside mt-1">
-              {filteredTeams.map(team => (
-                <li key={team.id}>{team.name} - {team.division.name}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
+        <strong>Note:</strong> This will create a general admin user who can access all leagues and manage the system.
       </div>
       
       <button 
         type="submit" 
-        className="bg-[color:var(--lu-red)] text-white font-semibold rounded px-4 py-2 mt-2 hover:bg-red-800 transition" 
-        disabled={filteredTeams.length === 0}
+        className="bg-[color:var(--lu-red)] text-white font-semibold rounded px-4 py-2 mt-2 hover:bg-red-800 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+        disabled={isSubmitting}
       >
-        Add Admin
+        {isSubmitting ? 'Adding Admin...' : 'Add Admin'}
       </button>
-      
-      {filteredTeams.length === 0 && selectedCoordinatorType && selectedGender && (
-        <div className="text-red-600 text-sm text-center">No teams found for this coordinator type and gender combination.</div>
-      )}
     </form>
   );
 }
