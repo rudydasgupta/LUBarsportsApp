@@ -71,9 +71,17 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(async (tx) => {
       const prev = fixture.result!;
       const toPoints = (hs: number, as: number) => {
-        if (hs > as) return { home: 3, away: 0 };
-        if (as > hs) return { home: 0, away: 3 };
-        return { home: 1, away: 1 };
+        // New system: 1 point per game/frame won + 2 points for match win
+        if (hs > as) {
+          // Home team wins: gets points for games won + 2 bonus points for match win
+          return { home: hs + 2, away: as };
+        } else if (as > hs) {
+          // Away team wins: gets points for games won + 2 bonus points for match win
+          return { home: hs, away: as + 2 };
+        } else {
+          // Draw: each team gets points for games won (no bonus)
+          return { home: hs, away: as };
+        }
       };
       const prevPts = toPoints(prev.homeScore, prev.awayScore);
       if (prevPts.home !== 0) {
