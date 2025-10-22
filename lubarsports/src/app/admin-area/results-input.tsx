@@ -191,7 +191,9 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
         <p className="text-gray-500 text-center py-8">No fixtures this week.</p>
       ) : (
         <div className="space-y-4">
-          {visibleFixtures.map((fixture) => (
+          {visibleFixtures.map((fixture) => {
+            console.log('Fixture:', fixture.id, 'Has result:', !!fixture.result, 'Result:', fixture.result);
+            return (
             <div key={fixture.id} className="border border-gray-300 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex-1">
@@ -265,6 +267,15 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
                             body: JSON.stringify({ fixtureId: fixture.id })
                           });
                           if (res.ok) {
+                            // Reset the input boxes for this fixture
+                            setResults(prev => ({
+                              ...prev,
+                              [fixture.id]: {
+                                homeScore: 0,
+                                awayScore: 0,
+                                details: ''
+                              }
+                            }));
                             setMessage({ type: 'success', text: 'Result cleared.' });
                           } else {
                             const err = await res.json().catch(() => ({} as any));
@@ -284,7 +295,8 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
