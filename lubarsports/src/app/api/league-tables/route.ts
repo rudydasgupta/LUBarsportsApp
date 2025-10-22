@@ -13,6 +13,11 @@ export async function GET() {
           name: true,
           points: true,
         },
+        where: {
+          name: {
+            not: 'N/A'  // Exclude the placeholder N/A team from league tables
+          }
+        },
         orderBy: {
           points: 'desc',
         },

@@ -18,23 +18,43 @@ async function getAdminFromCookie() {
       id: 0,
       email: 'r.dasgupta@lancaster.ac.uk',
       fullName: 'Super Admin',
-      teamId: 1 // Default to first team for demo
+      adminType: 'SUPER',
+      teamId: null
     };
   }
   
-  // Check if it's a regular admin session
+  // Check if it's a general admin session
   if (sessionId.startsWith('admin_')) {
     const adminId = Number(sessionId.replace('admin_', ''));
-    const admin = await prisma.captain.findUnique({
-      where: { id: adminId },
-      include: { team: true }
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId }
     });
     if (admin) {
       return {
         id: admin.id,
         email: admin.email,
         fullName: admin.fullName || 'Admin User',
-        teamId: admin.teamId
+        adminType: admin.adminType,
+        teamId: null
+      };
+    }
+  }
+  
+  // Check if it's a captain session
+  if (sessionId.startsWith('captain_')) {
+    const captainId = Number(sessionId.replace('captain_', ''));
+    const captain = await prisma.captain.findUnique({
+      where: { id: captainId },
+      include: { team: { include: { division: true } } }
+    });
+    if (captain) {
+      return {
+        id: captain.id,
+        email: captain.email,
+        fullName: captain.fullName || 'Captain',
+        adminType: captain.adminType || 'CAPTAIN',
+        teamId: captain.teamId,
+        division: captain.team.division.name
       };
     }
   }
@@ -48,26 +68,21 @@ export default async function AdminAreaPage() {
     redirect("/login");
   }
   
-  // Only super admin can access admin area (for pool nominations)
-  const cookieStore = await cookies();
-  const sessionValue = cookieStore.get(SESSION_COOKIE)?.value;
-  if (sessionValue !== 'super_admin') {
+  // Only super admin and general admin can access admin area (for pool nominations)
+  if (admin.adminType !== 'SUPER' && admin.adminType !== 'GENERAL') {
     redirect("/results-input");
   }
-  // Get the admin's team (for demo purposes)
-  const team = await prisma.team.findUnique({
-    where: { id: admin.teamId },
-    include: { division: true },
-  });
   
-  if (!team) {
-    return <div className="p-8 text-center">Team not found.</div>;
+  // For super admin, show all divisions. For general admin, show all divisions too.
+  const allDivisions = await prisma.division.findMany({ orderBy: { name: 'asc' } });
+  const allowedDivisions = allDivisions;
+  
+  if (allowedDivisions.length === 0) {
+    return <div className="p-8 text-center">No divisions available.</div>;
   }
   
-  // Determine division name and coordinator type
-  const divisionName = team.division.name;
-  const isPoolCoordinator = divisionName.toLowerCase().includes('pool');
-  const isDartsCoordinator = divisionName.toLowerCase().includes('darts');
+  // Use the first division as default
+  const divisionName = allowedDivisions[0].name;
   
   // Get fixtures for this division (both upcoming and past for results input)
   const fixtures = await prisma.fixture.findMany({
@@ -138,20 +153,18 @@ export default async function AdminAreaPage() {
           </div>
         </div>
         <p className="text-center text-gray-700 mb-4">
-          Welcome, {admin.fullName || admin.email}! Here you can manage {isPoolCoordinator ? 'pool nominations and results' : 'results'} for {divisionName}.
+          Welcome, {admin.fullName || admin.email}! Here you can manage pool nominations and results for {divisionName}.
         </p>
         
-        {isPoolCoordinator && (
-          <section className="w-full">
-            <h2 className="text-xl font-semibold mb-4">Pool Nominations</h2>
-            <PoolUploadWrapper fixtures={upcomingFixtures} team={team} captain={admin} />
-          </section>
-        )}
+        <section className="w-full">
+          <h2 className="text-xl font-semibold mb-4">Pool Nominations</h2>
+          <PoolUploadWrapper fixtures={upcomingFixtures} team={null} captain={admin} />
+        </section>
         
         <section className="w-full">
           <ResultsInput 
             fixtures={fixturesForResults} 
-            coordinatorType={isPoolCoordinator ? 'CPC' : 'CDC'} 
+            coordinatorType={admin.adminType || 'Admin'} 
             divisionName={divisionName} 
           />
         </section>

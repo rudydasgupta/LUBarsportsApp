@@ -86,11 +86,9 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
     return d >= start && d <= end;
   }
 
-  const currentWeekStart = getWeekStart(new Date());
+  // Remove week restriction - allow input for any week
   function isFixtureInCurrentWeek(dateString: string) {
-    const d = new Date(dateString);
-    const fixtureWeekStart = getWeekStart(d);
-    return isSameDay(fixtureWeekStart, currentWeekStart);
+    return true; // Allow input for any week
   }
 
   const handleSubmit = async (fixtureId: number) => {
@@ -142,6 +140,7 @@ export default function ResultsInput({ fixtures, coordinatorType, divisionName }
   };
 
   const visibleFixtures = fixtures.filter(f => inSelectedWeek(f.date));
+  const currentWeekStart = getWeekStart(new Date());
   const isViewingCurrentWeek = isSameDay(selectedWeekStart, currentWeekStart);
 
   return (

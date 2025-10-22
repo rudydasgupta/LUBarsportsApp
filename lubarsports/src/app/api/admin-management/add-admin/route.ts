@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
       data: { 
         email, 
         password: hashed, 
-        teamId: firstTeam.id, 
+        teamId: firstTeam.id,
+        adminType: coordinatorType, // Persist CPC/CDC so permissions apply
         ...(fullName ? { fullName } : {}) 
       },
     });
