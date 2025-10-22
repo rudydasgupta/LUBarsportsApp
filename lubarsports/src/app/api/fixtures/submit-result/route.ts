@@ -31,25 +31,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Fixture not found' }, { status: 404 });
     }
 
-    // Get the admin's team to check permissions
-    const admin = await prisma.captain.findUnique({
-      where: { id: adminId },
-      include: { team: { include: { division: true } } }
-    });
-
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+    // Check admin permissions based on admin type
+    let hasPermission = false;
+    
+    // Check if it's a super admin (id = 0)
+    if (adminId === 0) {
+      hasPermission = true;
+    } else {
+      // Check Admin table first
+      const generalAdmin = await prisma.admin.findUnique({
+        where: { id: adminId }
+      });
+      
+      if (generalAdmin) {
+        // General admin can access all divisions
+        hasPermission = true;
+      } else {
+        // Check Captain table for coordinators
+        const captain = await prisma.captain.findUnique({
+          where: { id: adminId },
+          include: { team: { include: { division: true } } }
+        });
+        
+        if (captain) {
+          const adminType = captain.adminType;
+          const fixtureDivisionName = fixture.division.name.toLowerCase();
+          
+          if (adminType === 'CPC') {
+            // College Pool Coordinator can access pool and dominoes
+            hasPermission = fixtureDivisionName.includes('pool') || fixtureDivisionName.includes('domino');
+          } else if (adminType === 'CDC') {
+            // College Darts Coordinator can access darts and dominoes
+            hasPermission = fixtureDivisionName.includes('darts') || fixtureDivisionName.includes('domino');
+          } else {
+            // Regular captain can only access their own division
+            hasPermission = captain.team.division.name === fixture.division.name;
+          }
+        }
+      }
     }
-
-    // Check if admin has permission for this division
-    const adminDivisionName = admin.team.division.name.toLowerCase();
-    const fixtureDivisionName = fixture.division.name.toLowerCase();
     
-    // Allow if it's the same division or if the admin is a coordinator for the relevant sport
-    const isPoolCoordinator = adminDivisionName.includes('pool') && fixtureDivisionName.includes('pool');
-    const isDartsCoordinator = adminDivisionName.includes('darts') && fixtureDivisionName.includes('darts');
-    
-    if (!isPoolCoordinator && !isDartsCoordinator && adminDivisionName !== fixtureDivisionName) {
+    if (!hasPermission) {
       return NextResponse.json({ error: 'Permission denied for this division' }, { status: 403 });
     }
 
