@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:deploy": "node scripts/migrate.mjs",
     "db:seed": "tsx prisma/seed.ts",
     "season:start": "tsx scripts/start-season.ts",
     "admin:set": "tsx scripts/set-admin.ts"

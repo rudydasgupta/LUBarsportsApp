@@ -54,7 +54,7 @@ DATABASE_URL=postgresql://localhost/lubarsports npm run dev
 ## Deploying
 
 1. Back up the database (`pg_dump`).
-2. Apply migrations: `DATABASE_URL=<production> npx prisma migrate deploy`.
+2. Apply migrations: `npm run prisma:migrate:deploy`. Vercel's build command also runs this. It uses Neon's direct connection (`DIRECT_URL`, or `DATABASE_URL` without `-pooler`), because migrating through the pooler can leave a lock behind that makes the next deploy fail.
 3. Push to `main`; Vercel builds and deploys. Pages render on request, so the build doesn't touch the database.
 
 ## Scripts
