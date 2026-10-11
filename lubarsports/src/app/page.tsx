@@ -61,7 +61,10 @@ export default async function HomePage() {
             </Link>
           }
         />
-        <FixtureGrid fixtures={weekFixtures} empty="No fixtures this week." />
+        <FixtureGrid
+          fixtures={weekFixtures}
+          empty={data.fixtures.length === 0 ? `The ${data.season.name} fixture list will be published here soon.` : "No fixtures this week."}
+        />
       </section>
 
       <section aria-labelledby="tables-heading">

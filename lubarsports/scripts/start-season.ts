@@ -3,7 +3,7 @@
  * the current season (archiving the previous one). The admin panel's
  * Seasons page does the same; this is for doing it from a terminal.
  *
- *   npx tsx scripts/start-season.ts --name 2026/27 --michaelmas 2026-10-05 --lent 2027-01-11 [--swap] [--dry-run]
+ *   npx tsx scripts/start-season.ts --name 2026/27 --michaelmas 2026-10-05 --lent 2027-01-11 [--swap] [--no-fixtures] [--dry-run]
  */
 import { PrismaClient } from "@prisma/client";
 import { isValidIso, weekdayIndex } from "../src/lib/dates";
@@ -20,6 +20,7 @@ async function main() {
   const lentStart = arg("lent");
   const swapHomeAway = process.argv.includes("--swap");
   const dryRun = process.argv.includes("--dry-run");
+  const generateFixtures = !process.argv.includes("--no-fixtures");
   if (!name || !michaelmasStart || !lentStart) throw new Error("Usage: --name 2026/27 --michaelmas YYYY-MM-DD --lent YYYY-MM-DD");
   for (const d of [michaelmasStart, lentStart]) {
     if (!isValidIso(d) || weekdayIndex(d) !== 0) throw new Error(`${d} must be a Monday (YYYY-MM-DD).`);
@@ -38,18 +39,26 @@ async function main() {
       winBonus: 2,
       drawBonus: 0,
       divisionIds: divisions.map((d) => d.id),
-      generateFixtures: true,
+      generateFixtures,
       swapHomeAway,
       makeCurrent: true,
     };
-    const plan = await planFixtures(db, input);
-    console.log(`${name}: ${plan.planned.length} fixtures across ${divisions.length} leagues${swapHomeAway ? " (home and away swapped)" : ""}.`);
-    if (plan.missing.length) console.log("Missing teams:", plan.missing.join("; "));
+    if (generateFixtures) {
+      const plan = await planFixtures(db, input);
+      console.log(`${name}: ${plan.planned.length} fixtures across ${divisions.length} leagues${swapHomeAway ? " (home and away swapped)" : ""}.`);
+      if (plan.missing.length) console.log("Missing teams:", plan.missing.join("; "));
+    } else {
+      console.log(`${name}: no fixtures (add them later).`);
+    }
     if (dryRun) return;
 
     const result = await db.$transaction((tx) => createSeason(tx, input));
     await db.auditLog.create({
-      data: { actorName: "Script", action: "season.create", summary: `Created ${name} with ${result.created} fixtures and made it current.` },
+      data: {
+        actorName: "Script",
+        action: "season.create",
+        summary: `Created ${name}${generateFixtures ? ` with ${result.created} fixtures` : " without fixtures"} and made it current.`,
+      },
     });
     console.log(`Created season ${result.season.name} (id ${result.season.id}) with ${result.created} fixtures.`);
   } finally {
