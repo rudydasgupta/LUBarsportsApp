@@ -6,7 +6,8 @@
  *   npx tsx scripts/set-admin.ts --email you@lancaster.ac.uk --name "Your Name" --role SUPER
  *
  * You'll be asked for the password (typing is hidden). Or pass --generate to
- * create a temporary one, which must be changed at first sign-in.
+ * create a temporary one, which must be changed at first sign-in, or
+ * --keep-password to change only the role of an existing account.
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -48,9 +49,12 @@ async function main() {
   if (!email) throw new Error("Pass --email.");
   if (!(ROLES as readonly string[]).includes(role)) throw new Error(`--role must be one of ${ROLES.join(", ")}.`);
 
-  let password: string;
+  const keep = process.argv.includes("--keep-password");
+  let password = "";
   let mustChangePassword = false;
-  if (process.argv.includes("--generate")) {
+  if (keep) {
+    // Role change only; checked below that the account exists.
+  } else if (process.argv.includes("--generate")) {
     password = temporaryPassword();
     mustChangePassword = true;
   } else {
@@ -63,16 +67,18 @@ async function main() {
   const db = new PrismaClient();
   try {
     const host = (process.env.DATABASE_URL ?? "").replace(/^.*@/, "").replace(/[/?].*$/, "");
-    const hash = await bcrypt.hash(password, 12);
     const existing = await db.admin.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
-    const data = { adminType: role, college, active: true, password: hash, mustChangePassword };
+    if (keep && !existing) throw new Error(`No account for ${email}; leave out --keep-password to create one.`);
+    const data = keep
+      ? { adminType: role, college, active: true }
+      : { adminType: role, college, active: true, password: await bcrypt.hash(password, 12), mustChangePassword };
     if (existing) {
       await db.admin.update({
         where: { id: existing.id },
         data: { ...data, ...(name ? { fullName: name } : {}), tokenVersion: { increment: 1 } },
       });
     } else {
-      await db.admin.create({ data: { ...data, email, fullName: name ?? null } });
+      await db.admin.create({ data: { ...data, password: await bcrypt.hash(password, 12), email, fullName: name ?? null } });
     }
     await db.auditLog.create({
       data: { actorName: "Script", action: existing ? "user.update" : "user.create", summary: `${existing ? "Updated" : "Created"} ${email} as ${role} from the command line` },
