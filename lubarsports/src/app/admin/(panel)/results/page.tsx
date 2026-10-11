@@ -26,6 +26,19 @@ export default async function AdminResultsPage({ searchParams }: Props) {
   const today = todayIso();
   const league = leagues.find((l) => l.league.slug === sp.league) ?? leagues[0];
   const weeks = [...new Set(league.fixtures.map((f) => f.week).filter((w): w is number => w !== null))].sort((a, b) => a - b);
+  if (weeks.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="eyebrow text-chalk">Season {data.season.name}</p>
+          <h1 className="display mt-2 text-4xl">Results</h1>
+        </div>
+        <EmptyState title="No fixtures yet">
+          <p>Results can be entered once the {data.season.name} fixtures have been added.</p>
+        </EmptyState>
+      </div>
+    );
+  }
   const requested = Number(sp.week);
   const week = weeks.includes(requested) ? requested : (defaultWeek(data, today) ?? weeks[0]);
   const fixtures = league.fixtures.filter((f) => f.week === week && f.status !== "CANCELLED");
