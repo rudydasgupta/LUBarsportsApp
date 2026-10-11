@@ -1,28 +1,31 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from "next/server";
+import { loadCurrentSeason } from "@/lib/season-data";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
+/** Current season's league tables as JSON. */
 export async function GET() {
-  // Get all divisions with teams (college name and points only)
-  const divisions = await prisma.division.findMany({
-    include: {
-      teams: {
-        select: {
-          id: true,
-          name: true,
-          points: true,
-        },
-        where: {
-          name: {
-            not: 'N/A'  // Exclude the placeholder N/A team from league tables
-          }
-        },
-        orderBy: {
-          points: 'desc',
-        },
-      },
-    },
+  const data = await loadCurrentSeason();
+  if (!data) return NextResponse.json({ season: null, divisions: [] });
+  return NextResponse.json({
+    season: data.season.name,
+    divisions: data.leagues.map((l) => ({
+      id: l.league.id,
+      name: l.league.name,
+      slug: l.league.slug,
+      sport: l.league.sport,
+      teams: l.standings.map((r) => ({
+        id: r.teamId,
+        name: r.team,
+        position: r.position,
+        played: r.played,
+        won: r.won,
+        drawn: r.drawn,
+        lost: r.lost,
+        framesFor: r.for,
+        framesAgainst: r.against,
+        points: r.points,
+      })),
+    })),
   });
-  return NextResponse.json({ divisions });
-} 
+}

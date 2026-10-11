@@ -1,79 +1,57 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { Crest } from "@/components/crest";
+import { RankBall } from "@/components/rank-ball";
+import { PageHeading } from "@/components/states";
+import { COLLEGES } from "@/lib/config";
+import { loadCurrentSeason } from "@/lib/season-data";
 
-const collegeData = [
-  {
-    name: "Bowland",
-    logo: "/colleges/bowland.png",
-    color: "#d90429",
-  },
-  {
-    name: "Cartmel",
-    logo: "/colleges/cartmel.png",
-    color: "#7a003c",
-  },
-  {
-    name: "County",
-    logo: "/colleges/county.png",
-    color: "#003865",
-  },
-  {
-    name: "Furness",
-    logo: "/colleges/furness.png",
-    color: "#3d2c91",
-  },
-  {
-    name: "Fylde",
-    logo: "/colleges/fylde.png",
-    color: "#ff9900",
-  },
-  {
-    name: "Graduate",
-    logo: "/colleges/graduate.png",
-    color: "#b8002e",
-  },
-  {
-    name: "Grizedale",
-    logo: "/colleges/grizedale.png",
-    color: "#005eb8",
-  },
-  {
-    name: "Lonsdale",
-    logo: "/colleges/lonsdale.png",
-    color: "#003366",
-  },
-  {
-    name: "Pendle",
-    logo: "/colleges/pendle.png",
-    color: "#ffb800",
-  },
-];
+export const metadata: Metadata = { title: "Colleges" };
 
-export default function CollegesPage() {
+export default async function CollegesPage() {
+  const data = await loadCurrentSeason();
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-white text-black p-4">
-      <h1 className="text-3xl font-bold mb-8 text-center">College Home Pages</h1>
-      <nav className="w-full max-w-2xl">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {collegeData.map((college) => (
-            <Link
-              key={college.name}
-              href={`/colleges/${college.name.toLowerCase()}`}
-              className="flex flex-col items-center justify-center rounded-lg px-6 py-8 text-2xl font-semibold shadow min-h-[150px] text-center border-2 border-black hover:scale-105 transition"
-              style={{ backgroundColor: '#fff', color: college.color }}
-            >
-              <Image
-                src={college.logo}
-                alt={`${college.name} logo`}
-                width={64}
-                height={64}
-                className="mb-4"
-              />
-              {college.name} College
-            </Link>
-          ))}
-        </div>
-      </nav>
-    </main>
+    <>
+      <PageHeading
+        eyebrow={data ? `Season ${data.season.name}` : undefined}
+        title="Colleges"
+        lead="Nine colleges, six leagues. Choose a college for its positions, fixtures and results."
+      />
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {COLLEGES.map((c) => {
+          const rows = (data?.leagues ?? [])
+            .map((l) => ({ league: l.league, row: l.standings.find((r) => r.team === c.name) }))
+            .filter((x) => x.row);
+          const points = rows.reduce((n, x) => n + (x.row?.points ?? 0), 0);
+          const played = rows.reduce((n, x) => n + (x.row?.played ?? 0), 0);
+          const best = rows
+            .filter((x) => x.row?.position)
+            .sort((a, b) => (a.row!.position ?? 99) - (b.row!.position ?? 99))[0];
+          return (
+            <li key={c.slug}>
+              <Link
+                href={`/colleges/${c.slug}`}
+                className="card group relative flex h-full items-center gap-4 overflow-hidden p-4 transition-[border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-line-strong sm:p-5"
+              >
+                <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ background: c.color }} />
+                <Crest college={c.name} size="lg" className="transition-transform duration-300 group-hover:scale-105" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xl font-bold">{c.name}</p>
+                  <p className="text-[0.8125rem] text-muted">
+                    {played} {played === 1 ? "match" : "matches"} &middot; <span className="num">{points}</span> points
+                  </p>
+                  {best?.row?.position ? (
+                    <p className="mt-2 flex items-center gap-2 text-[0.8125rem] text-muted">
+                      <RankBall rank={best.row.position} />
+                      <span className="truncate">Best: {best.league.name}</span>
+                    </p>
+                  ) : null}
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
-} 
+}

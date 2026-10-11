@@ -1,57 +1,382 @@
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
+/* Dark mode is driven by data-theme on <html> (set before first paint by the
+   inline script in layout.tsx). Dark is the default; light is optional. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ----------------------------------------------------------------------------
+   Design tokens: Lancaster red on black, shared with the LUPSC rankings site.
+   Change them here and the whole site follows. The red matches the rose in
+   the Bar Sports logo.
+   ------------------------------------------------------------------------- */
 :root {
-  --lu-red: #d90429;
-  --lu-black: #000000;
-  --lu-white: #ffffff;
+  --paper: #f4f4f6;
+  --surface: #ffffff;
+  --raised: #eeeef1;
+  --ink: #0d0d10;
+  --muted: #5a5a66;
+  --line: #e2e2e8;
+  --line-strong: #c6c6cf;
+
+  /* "cloth" is the primary action colour (kept as the token name so every
+     component follows): LUPSC red. */
+  --cloth: #b8141f;
+  --cloth-deep: #8f0f18;
+  --on-cloth: #ffffff;
+  --on-cloth-muted: #f6d5d8;
+
+  --chalk: #b8141f;
+  --win: #157a43;
+  --loss: #b8141f;
+  --cue: #8a6a12;
+  --chart-line: #b8141f;
+
+  --draw: #5a5a66;
+  --win-wash: #e3f3ea;
+  --loss-wash: #fbe8ea;
+  --chalk-wash: #fbe8ea;
+  --cue-wash: #f8f0d6;
+
+  --glow: rgba(200, 16, 46, 0.18);
+  --grid: rgba(13, 13, 16, 0.05);
+  --glass: rgba(255, 255, 255, 0.82);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #07070a;
+  --surface: #0f0f13;
+  --raised: #18181e;
+  --ink: #f3f3f6;
+  --muted: #a0a0ad;
+  --line: #24242c;
+  --line-strong: #3a3a45;
+
+  --cloth: #c8102e;
+  --cloth-deep: #a00d25;
+  --on-cloth: #ffffff;
+  --on-cloth-muted: #f6c9d0;
+
+  --chalk: #ff6b7a;
+  --win: #4fd28c;
+  --loss: #ff7a86;
+  --cue: #e6c36a;
+  --chart-line: #ff4d5e;
+
+  --draw: #b4b4c0;
+  --win-wash: #0f2b1e;
+  --loss-wash: #33121a;
+  --chalk-wash: #2d1016;
+  --cue-wash: #2e2610;
+
+  --glow: rgba(232, 24, 52, 0.28);
+  --grid: rgba(255, 255, 255, 0.035);
+  --glass: rgba(15, 15, 19, 0.72);
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--lu-white);
-  --color-foreground: var(--lu-black);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-cloth: var(--cloth);
+  --color-cloth-deep: var(--cloth-deep);
+  --color-on-cloth: var(--on-cloth);
+  --color-on-cloth-muted: var(--on-cloth-muted);
+  --color-chalk: var(--chalk);
+  --color-win: var(--win);
+  --color-loss: var(--loss);
+  --color-draw: var(--draw);
+  --color-cue: var(--cue);
+  --color-chart-line: var(--chart-line);
+  --color-win-wash: var(--win-wash);
+  --color-loss-wash: var(--loss-wash);
+  --color-chalk-wash: var(--chalk-wash);
+  --color-cue-wash: var(--cue-wash);
+  --color-lancaster: #b8141f;
+  --color-night: #07070a;
+
+  --font-sans: var(--font-archivo), var(--font-archivo-ext), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --lu-white: #0a0a0a;
-    --lu-black: #ededed;
+/* Archivo in an extra-wide cut for headings gives the site its futuristic
+   edge; normal width for body text. JetBrains Mono for scores and points. */
+@utility display {
+  font-stretch: 118%;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
+}
+
+@utility narrow {
+  font-stretch: 92%;
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-stretch: 112%;
+}
+
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--chalk);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: #c8102e;
+    color: #ffffff;
+  }
+
+  /* Native date inputs follow the theme. */
+  input[type="date"] {
+    color-scheme: inherit;
   }
 }
 
-body {
-  @apply text-black min-h-screen font-sans antialiased;
+@layer components {
+  .btn {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-3.5 py-2 text-sm font-semibold text-ink transition-[background-color,border-color,box-shadow] hover:border-ink/40 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply border-cloth bg-cloth text-on-cloth hover:border-cloth-deep hover:bg-cloth-deep;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 8px 24px -10px var(--glow);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1) inset, 0 10px 32px -8px var(--glow);
+  }
+
+  .btn-danger {
+    @apply border-loss bg-loss text-white hover:opacity-90 dark:text-[#2a0e0a];
+  }
+
+  .btn-quiet {
+    @apply border-transparent bg-transparent hover:bg-raised;
+  }
+
+  .btn-sm {
+    @apply min-h-8 px-2.5 py-1 text-[0.8125rem];
+  }
+
+  .input {
+    @apply block min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-[0.9375rem] text-ink transition-[border-color,box-shadow] placeholder:text-muted focus:border-cloth disabled:opacity-60;
+  }
+
+  .input[aria-invalid="true"] {
+    @apply border-loss;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-ink;
+  }
+
+  .hint {
+    @apply mt-1.5 text-[0.8125rem] text-muted;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-[0.8125rem] font-medium text-loss;
+  }
+
+  /* Panels: a hairline border with a faint highlight along the top edge. */
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.03) inset,
+      0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  /* A panel with a red-to-transparent edge, for featured content. */
+  .card-glow {
+    @apply relative rounded-xl;
+    background:
+      linear-gradient(var(--surface), var(--surface)) padding-box,
+      linear-gradient(135deg, rgb(200 16 46 / 0.75), var(--line) 40%, var(--line) 70%, rgb(200 16 46 / 0.35)) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 20px 50px -30px var(--glow);
+  }
+
+  .link {
+    @apply text-chalk underline decoration-1 underline-offset-[3px] hover:decoration-2;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-raised;
+  }
+
+  .select {
+    /* Used together with .input: class="input select". */
+    @apply appearance-none bg-[length:1rem] bg-[right_0.6rem_center] bg-no-repeat pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  }
+
+  /* Score boxes in the admin results grid. */
+  .score-input {
+    @apply num h-11 w-14 rounded-lg border border-line-strong bg-surface text-center text-lg font-bold text-ink transition-[border-color,box-shadow] focus:border-cloth;
+    -moz-appearance: textfield;
+  }
+
+  .score-input::-webkit-outer-spin-button,
+  .score-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Filter chips (league pickers, week pickers). */
+  .chip {
+    @apply inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line-strong px-3.5 py-1.5 text-sm font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink;
+  }
+
+  .chip[aria-current="page"],
+  .chip[aria-pressed="true"] {
+    @apply border-cloth bg-cloth text-on-cloth;
+    box-shadow: 0 6px 20px -10px var(--glow);
+  }
+
+  /* Data tables. */
+  .table {
+    @apply w-full border-collapse text-[0.9375rem];
+  }
+
+  .table thead th {
+    @apply eyebrow whitespace-nowrap border-b border-line px-3 py-2.5 text-left text-[0.625rem] text-muted;
+  }
+
+  .table td,
+  .table tbody th {
+    @apply border-b border-line px-3 py-2.5 text-left align-middle font-normal;
+  }
+
+  .table tbody tr:last-child td,
+  .table tbody tr:last-child th {
+    @apply border-b-0;
+  }
+
+  .table tbody tr {
+    @apply transition-colors hover:bg-raised/50;
+  }
+
+  /* Small all-caps tag, e.g. "Inactive". */
+  .tag {
+    @apply inline-flex items-center rounded-md border border-line-strong px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
 }
 
-.site-bg {
-  background-image: url('/backgrounds/BarSportsAppBackground.jpeg');
-  background-size: 320px auto; /* shrink: adjust pixel width as needed */
-  background-repeat: repeat;
-  background-position: top left;
-  background-attachment: scroll;
+/* The page backdrop: a fine grid that fades out, under a red glow at the
+   top. Purely decorative, behind everything, and still on scroll. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 26rem at 50% -8rem, var(--glow), transparent 70%),
+    radial-gradient(30rem 20rem at 100% 0, rgb(200 16 46 / 0.08), transparent 70%);
 }
 
-.table-header {
-  background-color: var(--lu-red);
-  color: var(--lu-white);
+.backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
 }
 
-.menu-link {
-  @apply bg-white border-2 border-neutral-200 text-black hover:bg-neutral-100 hover:text-black transition rounded-lg shadow-sm font-medium;
+/* A slow light sweep across the hero. */
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 
-.card {
-  @apply bg-white/80 rounded-2xl shadow-xl p-6 mb-6 backdrop-blur-md;
+.sweep {
+  position: relative;
+  overflow: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  @apply font-semibold text-gray-900;
+.sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.045) 50%, transparent 70%);
+  animation: sweep 7s ease-in-out infinite;
 }
 
-input, button, select, textarea {
-  @apply focus:outline-none focus:ring-2 focus:ring-[color:var(--lu-red)] transition;
+/* Soft red halo behind the hero logo. */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+.halo {
+  animation: pulse-glow 6s ease-in-out infinite;
+}
+
+/* HUD rings round the hero logo. */
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit {
+  animation: orbit 60s linear infinite;
+}
+
+.orbit-reverse {
+  animation: orbit 90s linear infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

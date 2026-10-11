@@ -1,293 +1,196 @@
-import Image from "next/image";
-import { PrismaClient } from "@prisma/client";
-import { formatDate } from "@/utils/dateFormat";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Crest } from "@/components/crest";
+import { FixtureList } from "@/components/fixture-list";
+import { FormChips } from "@/components/form-chips";
+import { RankBall } from "@/components/rank-ball";
+import { Eyebrow, SectionHeading, TableScroll } from "@/components/states";
+import { collegeBySlug, COLLEGES } from "@/lib/config";
+import { todayIso } from "@/lib/dates";
+import { getArchivedSeasons, loadCurrentSeason, loadSeason, type SeasonData } from "@/lib/season-data";
 
-const prisma = new PrismaClient();
+type Props = { params: Promise<{ college: string }> };
 
-const collegeData = {
-  bowland: {
-    name: "Bowland",
-    logo: "/colleges/bowland.png",
-    color: "#d90429",
-  },
-  cartmel: {
-    name: "Cartmel",
-    logo: "/colleges/cartmel.png",
-    color: "#7a003c",
-  },
-  county: {
-    name: "County",
-    logo: "/colleges/county.png",
-    color: "#003865",
-  },
-  furness: {
-    name: "Furness",
-    logo: "/colleges/furness.png",
-    color: "#3d2c91",
-  },
-  fylde: {
-    name: "Fylde",
-    logo: "/colleges/fylde.png",
-    color: "#ff9900",
-  },
-  graduate: {
-    name: "Graduate",
-    logo: "/colleges/graduate.png",
-    color: "#b8002e",
-  },
-  grizedale: {
-    name: "Grizedale",
-    logo: "/colleges/grizedale.png",
-    color: "#005eb8",
-  },
-  lonsdale: {
-    name: "Lonsdale",
-    logo: "/colleges/lonsdale.png",
-    color: "#003366",
-  },
-  pendle: {
-    name: "Pendle",
-    logo: "/colleges/pendle.png",
-    color: "#ffb800",
-  },
-};
-
-async function getUpcomingFixtures(collegeName: string) {
-  const currentDate = new Date();
-  
-  const teams = await prisma.team.findMany({
-    where: { name: collegeName },
-    include: { division: true }
-  });
-
-  if (teams.length === 0) return [] as any[];
-
-  const allFixtures = await prisma.fixture.findMany({
-    where: {
-      OR: [
-        { homeTeamId: { in: teams.map(t => t.id) } },
-        { awayTeamId: { in: teams.map(t => t.id) } }
-      ],
-      date: { gte: currentDate }
-    },
-    include: {
-      homeTeam: true,
-      awayTeam: true,
-      division: true,
-      result: true
-    },
-    orderBy: { date: 'asc' }
-  });
-
-  const fixturesByLeague = new Map<string, any[]>();
-  
-  allFixtures.forEach(fixture => {
-    const divisionName = fixture.division.name;
-    if (!fixturesByLeague.has(divisionName)) {
-      fixturesByLeague.set(divisionName, []);
-    }
-    const leagueFixtures = fixturesByLeague.get(divisionName)!;
-    if (leagueFixtures.length < 2) {
-      leagueFixtures.push(fixture);
-    }
-  });
-
-  const result: any[] = [];
-  for (const leagueFixtures of fixturesByLeague.values()) {
-    result.push(...leagueFixtures);
-  }
-  
-  return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { college } = await params;
+  const c = collegeBySlug(college);
+  return { title: c ? `${c.name} College` : "College" };
 }
 
-async function getLatestResults(collegeName: string) {
-  const teams = await prisma.team.findMany({ where: { name: collegeName } });
-  if (teams.length === 0) return [] as any[];
-
-  const latest = await prisma.fixture.findMany({
-    where: {
-      OR: [
-        { homeTeamId: { in: teams.map(t => t.id) } },
-        { awayTeamId: { in: teams.map(t => t.id) } }
-      ],
-      result: { isNot: null }
-    },
-    include: {
-      homeTeam: true,
-      awayTeam: true,
-      division: true,
-      result: true
-    },
-    orderBy: { date: 'desc' },
-    take: 5
-  });
-
-  return latest;
+function positions(data: SeasonData, college: string) {
+  return data.leagues
+    .map((l) => ({ league: l.league, row: l.standings.find((r) => r.team === college), size: l.standings.length }))
+    .filter((x): x is typeof x & { row: NonNullable<typeof x.row> } => Boolean(x.row));
 }
 
-async function getLeagueRanks(collegeName: string) {
-  // Get all divisions
-  const divisions = await prisma.division.findMany({
-    orderBy: { name: 'asc' }
-  });
+export default async function CollegePage({ params }: Props) {
+  const { college: slug } = await params;
+  const college = collegeBySlug(slug);
+  if (!college) notFound();
 
-  const leagueRanks = [];
+  const [data, archived] = await Promise.all([loadCurrentSeason(), getArchivedSeasons()]);
+  const previous = archived[0] ? await loadSeason(archived[0].id) : null;
+  const today = todayIso();
 
-  for (const division of divisions) {
-    // Get all teams in this division, ordered by points (descending)
-    const teams = await prisma.team.findMany({
-      where: { divisionId: division.id },
-      orderBy: { points: 'desc' }
-    });
-
-    // Find the college's position in this division
-    const collegeTeam = teams.find(team => team.name === collegeName);
-    if (collegeTeam) {
-      const position = teams.findIndex(team => team.id === collegeTeam.id) + 1;
-      leagueRanks.push({
-        league: division.name,
-        rank: position,
-        points: collegeTeam.points
-      });
-    }
-  }
-
-  return leagueRanks;
-}
-
-export default async function CollegeHomePage({ params }: { params: Promise<{ college: string }> }) {
-  const { college: collegeSlug } = await params;
-  const college = collegeData[collegeSlug as keyof typeof collegeData];
-  if (!college) {
-    return <div className="p-8 text-center">College not found.</div>;
-  }
-
-  const [upcomingFixtures, latestResults, leagueRanks] = await Promise.all([
-    getUpcomingFixtures(college.name),
-    getLatestResults(college.name),
-    getLeagueRanks(college.name)
-  ]);
+  const mine = (data?.fixtures ?? []).filter((f) => f.home === college.name || f.away === college.name);
+  const upcoming = mine.filter((f) => !f.result && f.status !== "CANCELLED" && f.date >= today).slice(0, 8);
+  const recent = mine.filter((f) => f.result).reverse().slice(0, 8);
+  const rows = data ? positions(data, college.name) : [];
+  const total = rows.reduce(
+    (t, { row }) => ({ w: t.w + row.won, d: t.d + row.drawn, l: t.l + row.lost, pts: t.pts + row.points, f: t.f + row.for }),
+    { w: 0, d: 0, l: 0, pts: 0, f: 0 },
+  );
+  const lastSeason = previous ? positions(previous, college.name) : [];
+  const index = COLLEGES.findIndex((c) => c.slug === college.slug);
+  const prevCollege = COLLEGES[(index + COLLEGES.length - 1) % COLLEGES.length];
+  const nextCollege = COLLEGES[(index + 1) % COLLEGES.length];
 
   return (
-    <main className="min-h-screen flex flex-col items-center bg-white text-black p-4">
-      <div className="flex flex-col items-center mb-8">
-        <Image src={college.logo} alt={`${college.name} logo`} width={96} height={96} className="mb-4" />
-        <h1 className="text-4xl font-bold mb-2">{college.name} College</h1>
-      </div>
-      <section className="w-full max-w-2xl mb-8 bg-gray-100 rounded-lg p-4 text-black">
-        <h2 className="text-2xl font-semibold mb-2">League Ranks</h2>
-        <table className="min-w-full border border-gray-300 mb-2">
-          <thead>
-            <tr className="table-header">
-              <th className="px-4 py-2 border">League</th>
-              <th className="px-4 py-2 border">Rank</th>
-              <th className="px-4 py-2 border">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leagueRanks.length === 0 ? (
+    <div className="space-y-12">
+      <section className="card-glow overflow-hidden" aria-labelledby="college-heading">
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1" style={{ background: college.color }} />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full opacity-25 blur-3xl"
+          style={{ background: college.color }}
+        />
+        <div className="relative flex flex-wrap items-center gap-6 px-5 py-7 sm:px-8">
+          <Crest college={college.name} size="xl" />
+          <div className="min-w-0 flex-1">
+            <Eyebrow>{data ? `Season ${data.season.name}` : "College"}</Eyebrow>
+            <h1 id="college-heading" className="display mt-2 text-[2.5rem] sm:text-6xl">
+              {college.name}
+            </h1>
+          </div>
+          <nav aria-label="Other colleges" className="flex gap-2">
+            <Link href={`/colleges/${prevCollege.slug}`} className="btn btn-sm">
+              <span aria-hidden="true">&larr;</span> {prevCollege.name}
+            </Link>
+            <Link href={`/colleges/${nextCollege.slug}`} className="btn btn-sm">
+              {nextCollege.name} <span aria-hidden="true">&rarr;</span>
+            </Link>
+          </nav>
+        </div>
+        <dl className="relative grid grid-cols-2 border-t border-line sm:grid-cols-4 sm:divide-x sm:divide-line [&>div:nth-child(-n+2)]:border-b [&>div:nth-child(-n+2)]:border-line sm:[&>div:nth-child(-n+2)]:border-b-0">
+          {[
+            { label: "Leagues", value: String(rows.length) },
+            { label: "Won · Drawn · Lost", value: `${total.w}·${total.d}·${total.l}` },
+            { label: "Frames won", value: String(total.f) },
+            { label: "Total points", value: String(total.pts) },
+          ].map((s) => (
+            <div key={s.label} className="px-5 py-4 sm:px-6">
+              <dt className="eyebrow text-[0.625rem] text-muted">{s.label}</dt>
+              <dd className="num mt-1.5 text-[1.5rem] font-semibold leading-none sm:text-[1.75rem]">{s.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section aria-labelledby="positions-heading">
+        <SectionHeading id="positions-heading" eyebrow="Every league" title="League positions" />
+        <TableScroll label={`${college.name} league positions`}>
+          <table className="table min-w-[34rem]">
+            <thead>
               <tr>
-                <td colSpan={3} className="px-4 py-2 border text-center text-gray-500">
-                  No league data available
-                </td>
+                <th scope="col">League</th>
+                <th scope="col">Position</th>
+                <th scope="col" className="text-right">
+                  P
+                </th>
+                <th scope="col" className="text-right">
+                  W-D-L
+                </th>
+                <th scope="col" className="text-right">
+                  Pts
+                </th>
+                <th scope="col" className="hidden sm:table-cell">
+                  Form
+                </th>
               </tr>
-            ) : (
-              leagueRanks.map((rank, index) => (
-                <tr key={index}>
-                  <td className="px-4 py-2 border text-center">{rank.league}</td>
-                  <td className="px-4 py-2 border text-center font-semibold">
-                    {rank.rank === 1 ? '🥇' : rank.rank === 2 ? '🥈' : rank.rank === 3 ? '🥉' : ''} {rank.rank}
+            </thead>
+            <tbody>
+              {rows.map(({ league, row, size }) => (
+                <tr key={league.id}>
+                  <th scope="row">
+                    <Link href={`/leagues/${league.slug}`} className="font-semibold hover:text-chalk">
+                      {league.name}
+                    </Link>
+                    <span className="block text-[0.75rem] text-muted">{league.sport}</span>
+                  </th>
+                  <td>
+                    {row.position ? (
+                      <span className="inline-flex items-center gap-2">
+                        <RankBall rank={row.position} />
+                        <span className="text-[0.8125rem] text-muted">of {size}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted">&ndash;</span>
+                    )}
                   </td>
-                  <td className="px-4 py-2 border text-center">{rank.points}</td>
+                  <td className="num text-right text-muted">{row.played}</td>
+                  <td className="num text-right text-muted">
+                    {row.won}-{row.drawn}-{row.lost}
+                  </td>
+                  <td className="num text-right text-[1.0625rem] font-bold">{row.points}</td>
+                  <td className="hidden sm:table-cell">
+                    <FormChips form={row.form} />
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
       </section>
-      <section className="w-full max-w-2xl mb-8 bg-gray-100 rounded-lg p-4 text-black">
-        <h2 className="text-2xl font-semibold mb-2">Next 2 Fixtures (All Leagues)</h2>
-        <table className="min-w-full border border-gray-300 mb-2">
-          <thead>
-            <tr className="table-header">
-              <th className="px-4 py-2 border">Date</th>
-              <th className="px-4 py-2 border">Opponent</th>
-              <th className="px-4 py-2 border">League</th>
-              <th className="px-4 py-2 border">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {upcomingFixtures.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-2 border text-center text-gray-500">
-                  No upcoming fixtures
-                </td>
-              </tr>
-            ) : (
-              upcomingFixtures.map((fixture) => {
-                const isHome = fixture.homeTeam.name === college.name;
-                const opponent = isHome ? fixture.awayTeam.name : fixture.homeTeam.name;
-                const venue = isHome ? 'vs' : '@';
-                const resultText = fixture.result ? `${fixture.result.homeScore} - ${fixture.result.awayScore}` : '-';
-                
-                return (
-                  <tr key={fixture.id}>
-                    <td className="px-4 py-2 border text-center">
-                      {formatDate(fixture.date)}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {venue} {opponent}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {fixture.division.name}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {resultText}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </section>
-      <section className="w-full max-w-2xl mb-8 bg-gray-100 rounded-lg p-4 text-black">
-        <h2 className="text-2xl font-semibold mb-2">Latest Results</h2>
-        <table className="min-w-full border border-gray-300 mb-2">
-          <thead>
-            <tr className="table-header">
-              <th className="px-4 py-2 border">Date</th>
-              <th className="px-4 py-2 border">Opponent</th>
-              <th className="px-4 py-2 border">Result</th>
-              <th className="px-4 py-2 border">League</th>
-            </tr>
-          </thead>
-          <tbody>
-            {latestResults.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-2 border text-center text-gray-500">
-                  No recent results
-                </td>
-              </tr>
-            ) : (
-              latestResults.map((fixture) => {
-                const isHome = fixture.homeTeam.name === college.name;
-                const opponent = isHome ? fixture.awayTeam.name : fixture.homeTeam.name;
-                const venue = isHome ? 'vs' : '@';
-                const resultText = fixture.result ? `${fixture.result.homeScore} - ${fixture.result.awayScore}` : '-';
-                return (
-                  <tr key={fixture.id}>
-                    <td className="px-4 py-2 border text-center">{formatDate(fixture.date)}</td>
-                    <td className="px-4 py-2 border text-center">{venue} {opponent}</td>
-                    <td className="px-4 py-2 border text-center">{resultText}</td>
-                    <td className="px-4 py-2 border text-center">{fixture.division.name}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </section>
-    </main>
+
+      <div className="grid gap-10 lg:grid-cols-2">
+        <section aria-labelledby="upcoming-heading" className="min-w-0">
+          <SectionHeading id="upcoming-heading" eyebrow="All leagues" title="Coming up" />
+          <FixtureList fixtures={upcoming} group="none" highlight={college.name} empty="No upcoming fixtures." />
+        </section>
+        <section aria-labelledby="recent-heading" className="min-w-0">
+          <SectionHeading id="recent-heading" eyebrow="All leagues" title="Recent results" />
+          <FixtureList fixtures={recent} group="none" highlight={college.name} empty="No results yet this season." />
+        </section>
+      </div>
+
+      {previous && lastSeason.length > 0 ? (
+        <section aria-labelledby="last-heading">
+          <SectionHeading
+            id="last-heading"
+            eyebrow="Archive"
+            title={`${previous.season.name} finishes`}
+            action={
+              <Link href={`/archive/${previous.season.slug}`} className="link text-sm font-semibold">
+                {previous.season.name} archive
+              </Link>
+            }
+          />
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {lastSeason.map(({ league, row, size }) => (
+              <li key={league.id}>
+                <Link
+                  href={`/archive/${previous.season.slug}/${league.slug}`}
+                  className="card flex h-full flex-col gap-2 p-4 transition-colors hover:border-line-strong"
+                >
+                  <span className="text-[0.8125rem] font-semibold text-muted">{league.name}</span>
+                  {row.position && row.played > 0 ? (
+                    <span className="flex items-center gap-2">
+                      <RankBall rank={row.position} size="lg" />
+                      <span className="text-[0.8125rem] text-muted">
+                        of {size}
+                        <span className="num block font-semibold text-ink">{row.points} pts</span>
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-muted">Not played</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
   );
-} 
+}

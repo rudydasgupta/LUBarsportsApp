@@ -1,5 +1,9 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// LU Bar Sports data model.
+//
+// Leagues ("divisions") and college teams carry over from season to season.
+// Fixtures belong to a season, and league tables are worked out from the
+// results each time they are shown, using that season's points rule, so an
+// archived season always shows exactly the table it finished with.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,106 +14,199 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Season {
+  id              Int                @id @default(autoincrement())
+  name            String             @unique // "2026/27"
+  slug            String             @unique // "2026-27"
+  status          String             @default("UPCOMING") // UPCOMING | ACTIVE | ARCHIVED
+  isCurrent       Boolean            @default(false)
+  // Monday of Michaelmas week 1 and of Lent week 11. League weeks are
+  // numbered from these, as in the university calendar.
+  michaelmasStart DateTime
+  lentStart       DateTime
+  // Points rule: one point per frame/leg/game won, plus these bonuses.
+  winBonus        Int                @default(2)
+  drawBonus       Int                @default(0)
+  notes           String?
+  createdAt       DateTime           @default(now())
+  fixtures        Fixture[]
+  adjustments     PointsAdjustment[]
+}
+
 model Division {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  sport     String
-  teams     Team[]
-  fixtures  Fixture[]
-  playerStats PlayerStat[]
+  id             Int                @id @default(autoincrement())
+  name           String             @unique
+  slug           String             @unique
+  sport          String // Pool | Darts | Dominoes
+  // 0 = Monday … 6 = Sunday. Used when generating fixtures.
+  matchDay       Int                @default(0)
+  // Frames/legs/games in a full match, so admins are warned about typos.
+  framesPerMatch Int?
+  sortOrder      Int                @default(0)
+  active         Boolean            @default(true)
+  teams          Team[]
+  fixtures       Fixture[]
+  playerStats    PlayerStat[]
+  adjustments    PointsAdjustment[]
 }
 
 model Team {
-  id         Int      @id @default(autoincrement())
-  name       String
-  division   Division @relation(fields: [divisionId], references: [id])
-  divisionId Int
-  players    Player[]
-  fixturesHome Fixture[] @relation("HomeTeam")
-  fixturesAway Fixture[] @relation("AwayTeam")
-  points     Int      @default(0)
-  captain    Captain?
+  id              Int                @id @default(autoincrement())
+  name            String // the college, or "N/A" for old placeholder fixtures
+  division        Division           @relation(fields: [divisionId], references: [id])
+  divisionId      Int
+  players         Player[]
+  fixturesHome    Fixture[]          @relation("HomeTeam")
+  fixturesAway    Fixture[]          @relation("AwayTeam")
+  // Legacy running total from before seasons existed. Tables are now
+  // calculated from results; this is no longer read or written.
+  points          Int                @default(0)
+  captain         Captain?
   poolNominations PoolNomination[]
+  adjustments     PointsAdjustment[]
 
   @@unique([name, divisionId])
 }
 
 model Player {
-  id      Int    @id @default(autoincrement())
-  name    String
-  team    Team   @relation(fields: [teamId], references: [id])
-  teamId  Int
-  stats   PlayerStat[]
+  id     Int          @id @default(autoincrement())
+  name   String
+  team   Team         @relation(fields: [teamId], references: [id])
+  teamId Int
+  stats  PlayerStat[]
 
   @@unique([name, teamId])
 }
 
 model Fixture {
-  id          Int      @id @default(autoincrement())
-  division    Division @relation(fields: [divisionId], references: [id])
-  divisionId  Int
-  homeTeam    Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  homeTeamId  Int
-  awayTeam    Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  awayTeamId  Int
-  date        DateTime
-  result      Result?
+  id              Int              @id @default(autoincrement())
+  season          Season           @relation(fields: [seasonId], references: [id])
+  seasonId        Int
+  week            Int?
+  division        Division         @relation(fields: [divisionId], references: [id])
+  divisionId      Int
+  homeTeam        Team             @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  homeTeamId      Int
+  awayTeam        Team             @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  awayTeamId      Int
+  date            DateTime
+  // SCHEDULED | POSTPONED | CANCELLED | VOID (placeholder, never shown)
+  status          String           @default("SCHEDULED")
+  notes           String?
+  updatedAt       DateTime         @default(now()) @updatedAt
+  result          Result?
   poolNominations PoolNomination[]
 
   @@unique([divisionId, homeTeamId, awayTeamId, date])
+  @@index([seasonId, week])
 }
 
 model Result {
+  id        Int      @id @default(autoincrement())
+  fixture   Fixture  @relation(fields: [fixtureId], references: [id])
+  fixtureId Int      @unique
+  homeScore Int
+  awayScore Int
+  details   String? // match notes and highlights, shown publicly
+  enteredBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model PointsAdjustment {
   id         Int      @id @default(autoincrement())
-  fixture    Fixture  @relation(fields: [fixtureId], references: [id])
-  fixtureId  Int      @unique
-  homeScore  Int
-  awayScore  Int
-  details    String?  // JSON or text for sport-specific details
+  season     Season   @relation(fields: [seasonId], references: [id])
+  seasonId   Int
+  division   Division @relation(fields: [divisionId], references: [id])
+  divisionId Int
+  team       Team     @relation(fields: [teamId], references: [id])
+  teamId     Int
+  points     Int // positive for a bonus, negative for a deduction
+  reason     String
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([seasonId, divisionId])
 }
 
 model PlayerStat {
-  id        Int     @id @default(autoincrement())
-  player    Player  @relation(fields: [playerId], references: [id])
-  playerId  Int
-  division  Division @relation(fields: [divisionId], references: [id])
-  divisionId Int
+  id          Int      @id @default(autoincrement())
+  player      Player   @relation(fields: [playerId], references: [id])
+  playerId    Int
+  division    Division @relation(fields: [divisionId], references: [id])
+  divisionId  Int
   gamesPlayed Int
   gamesWon    Int
   points      Int
   averages    Float?
 }
 
+// Unused since coordinators moved into Admin; kept so no data is dropped.
 model Captain {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  password String // hashed password
-  fullName String?
-  team     Team   @relation(fields: [teamId], references: [id])
-  teamId   Int   @unique
-  adminType String? // 'CDC' (College Darts Coordinator) or 'CPC' (College Pool Coordinator)
+  id        Int     @id @default(autoincrement())
+  email     String  @unique
+  password  String
+  fullName  String?
+  team      Team    @relation(fields: [teamId], references: [id])
+  teamId    Int     @unique
+  adminType String?
 }
 
 model Admin {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  password String // hashed password
-  fullName String?
-  adminType String // 'SUPER' (Super Admin) or 'GENERAL' (General Admin - can access all leagues)
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  password           String // bcrypt hash
+  fullName           String?
+  // SUPER: everything, including users and seasons.
+  // GENERAL: results, fixtures, leagues and announcements for every league.
+  // CPC / CDC: college pool / darts coordinator. Results for their sport and
+  //   dominoes, limited to fixtures involving their college when one is set.
+  adminType          String
+  college            String?
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  // Bumped on password change or sign-out-everywhere, which invalidates
+  // every existing session for this account.
+  tokenVersion       Int       @default(0)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  actorId   Int?
+  actorName String?
+  action    String // e.g. "result.save"
+  summary   String
+
+  @@index([createdAt])
+}
+
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  title       String
+  body        String
+  tone        String    @default("info") // info | success | warning
+  pinned      Boolean   @default(false)
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  createdBy   String?
+  createdAt   DateTime  @default(now())
 }
 
 model PoolNomination {
-  id         Int      @id @default(autoincrement())
-  fixture    Fixture  @relation(fields: [fixtureId], references: [id])
-  fixtureId  Int
-  team       Team     @relation(fields: [teamId], references: [id])
-  teamId     Int
-  gameNumber Int      // 1-9
-  playerName String
-  pickedFirst Boolean // true if this team picked first for this game
-  brokeFirst  Boolean // true if this team broke first for this game
-  locked     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  fixture     Fixture  @relation(fields: [fixtureId], references: [id])
+  fixtureId   Int
+  team        Team     @relation(fields: [teamId], references: [id])
+  teamId      Int
+  gameNumber  Int
+  playerName  String
+  pickedFirst Boolean
+  brokeFirst  Boolean
+  locked      Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@unique([fixtureId, teamId, gameNumber])
 }
